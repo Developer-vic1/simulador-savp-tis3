@@ -1,26 +1,26 @@
 {
   "name": "simulador-savp-tis3",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-
+  "description": "Motor Sinaptico de Compatibilidad Academico-Vocacional SAVP-TIS3",
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview",
-    "test": "echo \"Error: no test specified\" && exit 1"
-
+    "preview": "vite preview"
   },
-
-
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Developer-vic1/simulador-savp-tis3.git"
   },
-  "keywords": [],
+  "keywords": [
+    "react",
+    "vite",
+    "threejs",
+    "visualizacion-3d",
+    "savp"
+  ],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
   "bugs": {
     "url": "https://github.com/Developer-vic1/simulador-savp-tis3/issues"
   },
@@ -29,7 +29,13 @@
     "3d-force-graph": "^1.80.0",
     "d3-force-3d": "^3.0.6",
     "gsap": "^3.15.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
     "three": "^0.184.0",
+    "three-spritetext": "^1.10.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.2",
     "vite": "^8.0.14"
   }
 }
