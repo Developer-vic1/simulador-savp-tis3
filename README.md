@@ -1,107 +1,50 @@
-# Motor Sinaptico de Compatibilidad Academico-Vocacional SAVP-TIS3
+# Simulador SAVP-TIS3
 
-Demo visual 3D para representar el procesamiento interno del sistema SAVP-TIS3. La escena muestra como evidencias vocacionales, academicas, tecnicas y situacionales viajan por una red multicriterio, activan perfiles, fortalecen conexiones y llegan a una compatibilidad academico-vocacional explicable.
+Escena 3D interactiva que muestra cómo una consulta demo pasa por entradas, orquestación PETER 3, procesamiento paralelo, motor de evidencia, Bridge V2, perfiles de carrera, escenarios, tutor e integración PETER 2. La salida conserva un `traceId` y las referencias a los datos de origen.
 
-La demo no es un dashboard, no es un sistema administrativo y no es un reporte. Su objetivo es comunicar la logica interna del motor mediante una metafora sinaptica de propagacion de evidencias.
+> La metáfora visual neuronal/sináptica representa el flujo de información entre componentes del sistema y no corresponde a una red neuronal artificial.
 
-## Mejoras visuales y narrativas
+No se entrenan modelos, no se predice la probabilidad de éxito académico ni se envían datos a Laravel. El paquete de PETER 2 es una representación local lista para inspección, no una sincronización real. El corpus incluido es pequeño y de demostración, no está verificado externamente. La recuperación usa coincidencia léxica local; no ejecuta embeddings semánticos ni FAISS. Los contadores muestran el tamaño real del corpus demo y nunca cifras ficticias de producción.
 
-- Red 3D organizada por capas: fuentes, indicadores, perfiles, motor, areas, carreras y resultado.
-- Nodos con anillos por tipo para mejorar lectura visual: fuente, indicador, perfil, area, carrera y resultado.
-- Etiquetas tipo chip con mejor contraste y abreviacion visual en nombres largos.
-- Carreras visibles con nombre y porcentaje de compatibilidad.
-- Conexiones diferenciadas por peso, ruta recomendada, ruta alternativa y alerta formativa.
-- Particulas dosificadas por tipo de enlace para evitar saturacion visual.
-- Tarjeta de explicacion por fase con datos que ingresan, procesamiento, activaciones, resultado parcial y nota de defensa.
-- Mini consola interna con mensajes de procesamiento del motor.
+## Ejecutar
 
-## Modo claro y oscuro
-
-La aplicacion inicia en modo oscuro por defecto, con fondo profundo, nodos neon y lineas brillantes para reforzar la metafora sinaptica.
-
-Tambien incluye modo claro, pensado para presentaciones academicas con mayor contraste sobre fondo claro, colores sobrios y lineas visibles sin exceso de neon.
-
-La preferencia de tema se guarda en `localStorage`, por lo que la demo recuerda el ultimo modo seleccionado.
-
-## Fases del procesamiento
-
-El simulador recorre fases narrativas del procesamiento interno:
-
-1. Sistema en espera.
-2. Activacion del cuestionario RIASEC.
-3. Activacion del rendimiento LMS.
-4. Activacion de la especialidad BTH.
-5. Activacion del catalogo de carreras.
-6. Activacion de simulacion academico-profesional.
-7. Integracion en motor multicriterio.
-8. Propagacion hacia areas profesionales.
-9. Activacion de carreras preliminares.
-10. Recalculo posterior a simulacion.
-11. Compatibilidad final.
-12. Retroalimentacion y ruta recomendada.
-
-Estas fases se agrupan en cuatro capitulos visuales:
-
-- Capitulo 1: Entrada de evidencias.
-- Capitulo 2: Construccion de perfiles.
-- Capitulo 3: Integracion multicriterio.
-- Capitulo 4: Compatibilidad y retroalimentacion.
-
-## Flujo interno
-
-El caso de demostracion corresponde a un estudiante de 4to de secundaria con BTH en Sistemas Informaticos y aspiracion hacia Ingenieria de Sistemas.
-
-El motor integra:
-
-- Cuestionario vocacional RIASEC.
-- Rendimiento academico tipo LMS.
-- Especialidad BTH.
-- Catalogo de carreras.
-- Simulacion academico-profesional.
-- Aspiracion declarada.
-
-La compatibilidad final usa el siguiente modelo:
-
-```txt
-Compatibilidad Final =
-Cuestionario Vocacional * 0.25 +
-Rendimiento Academico LMS * 0.30 +
-Especialidad BTH * 0.20 +
-Simulacion Academico-Profesional * 0.20 +
-Aspiracion Declarada * 0.05
-```
-
-## Tecnologias
-
-- Vite
-- React
-- Three.js
-- 3d-force-graph
-- GSAP
-- d3-force-3d
-- CSS moderno
-
-## Instalacion y ejecucion
+Requiere Node.js compatible con Vite 8.
 
 ```bash
 npm install
 npm run dev
 ```
 
-## Comandos disponibles
+En PowerShell con ejecución de scripts restringida, usar `npm.cmd` y `npx.cmd` en lugar de `npm` y `npx`.
+
+## Flujo y arquitectura
+
+`src/simulation/SimulationEngine.js` controla estado, fases, señales, eventos y traza. `src/processors/index.js` calcula los resultados sin depender de Three.js. `src/data/demo.js` contiene un estudiante coherente, 30 respuestas RIASEC, tres periodos académicos, doce carreras, cinco documentos y tres escenarios. `src/graph/graphModel.js` define la topología espacial. `src/components/SynapticGraph.jsx` representa el estado del motor mediante Three.js, 3d-force-graph y GSAP; no calcula recomendaciones. `src/App.jsx` dispone controles, paneles y vista textual.
+
+El procesamiento RIASEC resta uno a cada respuesta 1–5 y suma cinco reactivos por dimensión. El código Holland toma las tres dimensiones de mayor valor. Analítica muestra notas por periodo y cambios. El motor de evidencia agrupa datos vocacionales, académicos, documentales, técnicos y situacionales. La falta de datos usa `{ status: "missing", value: null }`. Las reglas del Bridge registran `ruleId`, entradas, resultado y `traceId`; los perfiles mantienen afinidad, preparación, continuidad BTH e interés declarado por separado. Las respuestas de escenarios generan nueva evidencia y vuelven al motor antes de crear la explicación.
+
+## Controles
+
+- **Iniciar, Pausar/Continuar, Anterior, Siguiente y Reiniciar** controlan la ejecución.
+- **Guiado** enfoca la cámara en el componente de la fase; **Exploración** permite rotar y acercar la red.
+- **Auto** avanza las fases y se detiene ante los escenarios para recibir respuestas.
+- La velocidad puede cambiarse entre 0.5× y 2×.
+- Haz clic en nodos o enlaces para inspeccionar estado, evidencia o señales. **Ver traza** muestra eventos y el origen de las evidencias del perfil seleccionado.
+- **Vista textual** resume el flujo sin depender del canvas 3D.
+- `Espacio` pausa o continúa; `→` y `←` avanzan y retroceden; `Escape` cierra el panel. El modo de movimiento reducido evita viajes de cámara y partículas.
+
+## Estados y trazabilidad
+
+Los nodos pasan de espera a procesamiento y completado según eventos del motor. Las partículas aparecen únicamente mientras una señal registrada viaja por un enlace; al llegar se emite `SIGNAL_RECEIVED`. Cada ejecución crea un ID `SAVP-AAAA-MM-DD-NNNN`. Eventos, señales, evidencias, reglas, respuesta del tutor, paquete de integración y salida comparten ese ID. El panel de traza permite revisar el origen de cada evidencia usada por el perfil, además de la línea de tiempo.
+
+## Verificación
 
 ```bash
-npm run dev
+npm run lint
+npm run test
 npm run build
-npm run preview
+npx playwright install chromium
+npm run test:e2e
 ```
 
-## Rama de trabajo
-
-```bash
-dev/simulacion
-```
-
-## Advertencia tecnica
-
-La metafora visual es sinaptica, pero el modelo corresponde a una integracion multicriterio de evidencias. No representa una red neuronal entrenada, no ejecuta entrenamiento neuronal y no debe presentarse como inteligencia artificial predictiva entrenada.
+Las pruebas unitarias cubren normalización RIASEC, código Holland, datos ausentes, tendencias, reglas de perfiles, escenarios, EventBus y ejecución completa. Playwright verifica inicio, fases, escenarios, salida, traza y reinicio.

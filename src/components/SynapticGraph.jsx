@@ -3,269 +3,240 @@ import ForceGraph3D from "3d-force-graph";
 import SpriteText from "three-spritetext";
 import * as THREE from "three";
 import gsap from "gsap";
-import { forceX, forceY, forceZ } from "d3-force-3d";
-import { getLinkColor, getNodeColor, getParticleColor, ringColors } from "../utils/nodeColors.js";
-import {
-  getLinkWidth,
-  getNodeSize,
-  getParticleCount,
-  isLinkActive,
-  isNodeActive,
-} from "../utils/graphHelpers.js";
+import { colors } from "../graph/graphModel.js";
+import { phases } from "../simulation/SimulationEngine.js";
 
-const permanentLabelTypes = new Set(["source", "profile", "career", "result"]);
+const endpoint = (value) => (typeof value === "object" ? value.id : value);
 
-export default function SynapticGraph({
-  graphData,
-  currentPhase,
-  selectedNode,
-  highlightRecommendedPath,
-  theme,
-  onSelectNode,
-}) {
-  const containerRef = useRef(null);
-  const graphRef = useRef(null);
-  const nodeObjectsRef = useRef(new Map());
-  const phaseRef = useRef(currentPhase);
-  const highlightRef = useRef(highlightRecommendedPath);
-  const selectedNodeIdRef = useRef(selectedNode?.id ?? null);
-  const themeRef = useRef(theme);
-
-  useEffect(() => {
-    phaseRef.current = currentPhase;
-    highlightRef.current = highlightRecommendedPath;
-    selectedNodeIdRef.current = selectedNode?.id ?? null;
-    themeRef.current = theme;
-
-    updateNodeObjects(nodeObjectsRef.current, currentPhase, highlightRecommendedPath, selectedNode?.id ?? null, theme);
-
-    if (graphRef.current) {
-      graphRef.current
-        .linkDirectionalParticles((link) =>
-          getParticleCount(link, isLinkActive(link, currentPhase, highlightRecommendedPath), highlightRecommendedPath),
-        )
-        .linkDirectionalParticleColor((link) =>
-          getParticleColor(link, isLinkActive(link, currentPhase, highlightRecommendedPath), highlightRecommendedPath, theme),
-        )
-        .linkColor((link) =>
-          currentPhase === 0
-            ? "rgba(0,0,0,0)"
-            : getLinkColor(link, isLinkActive(link, currentPhase, highlightRecommendedPath), highlightRecommendedPath, theme),
-        )
-        .linkWidth((link) =>
-          currentPhase === 0
-            ? 0
-            : getLinkWidth(link, isLinkActive(link, currentPhase, highlightRecommendedPath), highlightRecommendedPath),
-        );
-      graphRef.current.refresh();
-    }
-  }, [currentPhase, highlightRecommendedPath, selectedNode, theme]);
-
-  useEffect(() => {
-    if (!containerRef.current) return undefined;
-
-    const Graph = ForceGraph3D()(containerRef.current)
-      .backgroundColor("rgba(0,0,0,0)")
-      .graphData(graphData)
-      .enableNodeDrag(true)
-      .showNavInfo(false)
-      .nodeThreeObject((node) => {
-        const nodeObject = createNodeObject(
-          node,
-          phaseRef.current,
-          highlightRef.current,
-          selectedNodeIdRef.current,
-          themeRef.current,
-        );
-        nodeObjectsRef.current.set(node.id, { node, object: nodeObject });
-        return nodeObject;
-      })
-      .nodeThreeObjectExtend(false)
-      .linkColor((link) =>
-        phaseRef.current === 0
-          ? "rgba(0,0,0,0)"
-          : getLinkColor(link, isLinkActive(link, phaseRef.current, highlightRef.current), highlightRef.current, themeRef.current),
-      )
-      .linkWidth((link) =>
-        phaseRef.current === 0
-          ? 0
-          : getLinkWidth(link, isLinkActive(link, phaseRef.current, highlightRef.current), highlightRef.current),
-      )
-      .linkOpacity(1)
-      .linkDirectionalArrowLength(0)
-      .linkDirectionalParticles((link) =>
-        getParticleCount(link, isLinkActive(link, phaseRef.current, highlightRef.current), highlightRef.current),
-      )
-      .linkDirectionalParticleColor((link) =>
-        getParticleColor(link, isLinkActive(link, phaseRef.current, highlightRef.current), highlightRef.current, themeRef.current),
-      )
-      .linkDirectionalParticleWidth((link) => {
-        if (link.recommended) return highlightRef.current ? 3 : 2.2;
-        if (link.alternative || link.alert) return 1.8;
-        return 1.2;
-      })
-      .linkDirectionalParticleSpeed((link) => 0.003 + (link.weight ?? 0.4) * 0.006)
-      .onNodeClick((node) => {
-        onSelectNode(node);
-        Graph.cameraPosition({ x: node.x + 55, y: node.y + 30, z: node.z + 110 }, node, 900);
-      });
-
-    const renderer = Graph.renderer();
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.6));
-
-    Graph.d3Force("charge").strength(-70);
-    Graph.d3Force("link").distance((link) => 46 + (1 - (link.weight ?? 0.5)) * 68);
-    Graph.d3Force("x", forceX((node) => node.layerX ?? 0).strength(0.16));
-    Graph.d3Force("y", forceY((node) => node.layerY ?? 0).strength(0.08));
-    Graph.d3Force("z", forceZ((node) => node.layerZ ?? 0).strength(0.035));
-    Graph.d3VelocityDecay(0.34);
-    Graph.cameraPosition({ x: 25, y: 42, z: 430 }, { x: 55, y: 0, z: 0 }, 0);
-
-    const resizeObserver = new ResizeObserver(() => {
-      const { clientWidth, clientHeight } = containerRef.current;
-      Graph.width(clientWidth);
-      Graph.height(clientHeight);
-    });
-    resizeObserver.observe(containerRef.current);
-
-    graphRef.current = Graph;
-    const ambientPulse = gsap.to(containerRef.current, {
-      "--synaptic-glow": 1,
-      duration: 2.4,
-      repeat: -1,
-      yoyo: true,
-      ease: "sine.inOut",
-    });
-
-    return () => {
-      ambientPulse.kill();
-      resizeObserver.disconnect();
-      disposeNodeObjects(nodeObjectsRef.current);
-      nodeObjectsRef.current.clear();
-      Graph._destructor();
-      graphRef.current = null;
-    };
-  }, [graphData, onSelectNode]);
-
-  return <div className="graph-stage" ref={containerRef} aria-label="Grafo sinaptico 3D" />;
-}
-
-function createNodeObject(node, currentPhase, highlightRecommendedPath, selectedNodeId = null, theme = "dark") {
+function nodeObject(node, state, selectedId, reducedMotion) {
   const group = new THREE.Group();
-  const sphereGeometry = new THREE.SphereGeometry(1, 24, 24);
-  const haloGeometry = new THREE.SphereGeometry(1, 24, 24);
-  const ringGeometry = new THREE.TorusGeometry(1.22, 0.045, 8, 48);
-
-  const sphere = new THREE.Mesh(
-    sphereGeometry,
-    new THREE.MeshBasicMaterial({ transparent: true, depthWrite: true }),
+  const current = state.phase >= node.phase;
+  const selected = selectedId === node.id;
+  const status = state.nodes[node.id] ?? (current ? "completed" : "waiting");
+  const color =
+    status === "warning"
+      ? "#e9ad67"
+      : status === "error"
+        ? "#e98282"
+        : colors[node.type];
+  const size = ["orchestrator", "evidence", "output"].includes(node.type)
+    ? 8.5
+    : node.type === "career"
+      ? 4.3
+      : 6;
+  const opacity =
+    state.phase === 0 && node.id !== "student" ? 0.1 : current ? 0.92 : 0.22;
+  group.add(
+    new THREE.Mesh(
+      new THREE.SphereGeometry(size, 14, 14),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity }),
+    ),
   );
   const halo = new THREE.Mesh(
-    haloGeometry,
-    new THREE.MeshBasicMaterial({ transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }),
+    new THREE.SphereGeometry(size * (selected ? 2.2 : 1.6), 14, 14),
+    new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: selected ? 0.24 : current ? 0.1 : 0.015,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    }),
   );
-  const selectedHalo = new THREE.Mesh(
-    haloGeometry.clone(),
-    new THREE.MeshBasicMaterial({ color: "#ffffff", transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }),
-  );
-  const ring = new THREE.Mesh(
-    ringGeometry,
-    new THREE.MeshBasicMaterial({ transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }),
-  );
-  const label = new SpriteText("");
-
-  label.padding = 3;
-  label.borderRadius = 4;
-  label.material.depthWrite = false;
-  label.renderOrder = 10;
-
   group.add(halo);
-  group.add(selectedHalo);
-  group.add(sphere);
-  group.add(ring);
-  group.add(label);
-  group.userData.parts = { sphere, halo, selectedHalo, ring, label };
-
-  updateNodeObject(group, node, currentPhase, highlightRecommendedPath, selectedNodeId, theme);
+  if (
+    selected ||
+    (node.type !== "career" && (current || state.phase > 0)) ||
+    node.id === "student"
+  ) {
+    const label = new SpriteText(node.label);
+    label.color = selected ? "#fff" : "#c9d9e8";
+    label.textHeight = selected ? 5.5 : node.type === "career" ? 3.6 : 4.4;
+    label.backgroundColor = "rgba(3, 9, 20, 0.52)";
+    label.padding = 2;
+    label.position.y = size + 7;
+    group.add(label);
+  }
+  if (!reducedMotion && status === "processing") {
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(size * 1.7, 0.42, 5, 32),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.7 }),
+    );
+    ring.rotation.x = Math.PI / 2.7;
+    group.add(ring);
+  }
   return group;
 }
 
-function updateNodeObjects(nodeObjects, currentPhase, highlightRecommendedPath, selectedNodeId, theme) {
-  nodeObjects.forEach(({ node, object }) => {
-    updateNodeObject(object, node, currentPhase, highlightRecommendedPath, selectedNodeId, theme);
+export default function SynapticGraph({
+  graphData,
+  state,
+  selectedId,
+  traceMode,
+  highlightFlow,
+  onSelectNode,
+  onSelectLink,
+  reducedMotion,
+}) {
+  const containerRef = useRef(null);
+  const graphRef = useRef(null);
+  const liveRef = useRef({
+    state,
+    selectedId,
+    traceMode,
+    highlightFlow,
+    onSelectNode,
+    onSelectLink,
+    reducedMotion,
   });
-}
+  liveRef.current = {
+    state,
+    selectedId,
+    traceMode,
+    highlightFlow,
+    onSelectNode,
+    onSelectLink,
+    reducedMotion,
+  };
 
-function updateNodeObject(group, node, currentPhase, highlightRecommendedPath, selectedNodeId, theme) {
-  const { sphere, halo, selectedHalo, ring, label } = group.userData.parts;
-  const waitingHidden = currentPhase === 0 && node.type !== "source";
-  const waitingSource = currentPhase === 0 && node.type === "source";
-  const active = isNodeActive(node, currentPhase) || (highlightRecommendedPath && node.recommended);
-  const selected = selectedNodeId === node.id;
-  const color = getNodeColor(node, active, highlightRecommendedPath, theme);
-  const size = getNodeSize(node, active || selected);
-  const ringColor = ringColors[node.type] ?? color;
-
-  sphere.scale.setScalar(size);
-  sphere.material.color.set(color);
-  sphere.material.opacity = waitingHidden ? 0.025 : waitingSource ? 0.56 : active ? 0.92 : 0.24;
-
-  halo.scale.setScalar(size * (selected ? 2.6 : 1.84));
-  halo.material.color.set(color);
-  halo.material.opacity = waitingHidden ? 0 : waitingSource ? 0.08 : active ? (selected ? 0.22 : 0.1) : 0.025;
-
-  selectedHalo.scale.setScalar(size * 3.15);
-  selectedHalo.material.opacity = selected ? 0.16 : 0;
-
-  ring.scale.setScalar(size * (selected ? 1.2 : 1));
-  ring.material.color.set(selected ? "#ffffff" : ringColor);
-  ring.material.opacity = waitingHidden ? 0 : selected ? 0.82 : active ? 0.58 : 0.22;
-
-  const showLabel = shouldShowLabel(node, waitingHidden, active, selected);
-  label.visible = showLabel;
-  if (showLabel) {
-    label.text = getNodeLabel(node);
-    label.color = theme === "light" ? "#0f172a" : selected ? "#ffffff" : "#e0f2fe";
-    label.textHeight = selected ? 5.2 : permanentLabelTypes.has(node.type) ? 4.25 : 3.55;
-    label.backgroundColor = theme === "light" ? "rgba(255, 255, 255, 0.78)" : "rgba(2, 6, 23, 0.58)";
-    label.position.set(0, size + 8.5, 0);
-  }
-}
-
-function shouldShowLabel(node, waitingHidden, active, selected) {
-  if (waitingHidden) return false;
-  if (permanentLabelTypes.has(node.type)) return true;
-  return active || selected;
-}
-
-function getNodeLabel(node) {
-  const label = abbreviateLabel(node.label, node.type === "career" ? 22 : 24);
-  if (node.type === "career" && Number.isFinite(node.score)) return `${label} - ${Math.round(node.score)}%`;
-  return label;
-}
-
-function abbreviateLabel(label, maxLength) {
-  if (label.length <= maxLength) return label;
-  const compact = label
-    .replace("Ingenieria", "Ing.")
-    .replace("Administracion", "Admin.")
-    .replace("Tecnologica", "Tec.")
-    .replace("Compatibilidad", "Compat.")
-    .replace("Simulacion", "Sim.")
-    .replace("Academico-Profesional", "Acad.-Prof.");
-
-  if (compact.length <= maxLength) return compact;
-  return `${compact.slice(0, maxLength - 1).trim()}...`;
-}
-
-function disposeNodeObjects(nodeObjects) {
-  nodeObjects.forEach(({ object }) => {
-    object.traverse((child) => {
-      if (child.geometry) child.geometry.dispose();
-      if (child.material) {
-        if (Array.isArray(child.material)) child.material.forEach((material) => material.dispose());
-        else child.material.dispose();
-      }
+  useEffect(() => {
+    const container = containerRef.current;
+    const graph = ForceGraph3D()(container)
+      .backgroundColor("rgba(0,0,0,0)")
+      .graphData(graphData)
+      .showNavInfo(false)
+      .enableNodeDrag(false)
+      .nodeThreeObject((node) =>
+        nodeObject(
+          node,
+          liveRef.current.state,
+          liveRef.current.selectedId,
+          liveRef.current.reducedMotion,
+        ),
+      )
+      .nodeThreeObjectExtend(false)
+      .linkDirectionalArrowLength(0)
+      .linkOpacity(0.75)
+      .onNodeClick((node) => liveRef.current.onSelectNode(node.id))
+      .onLinkClick((link) => liveRef.current.onSelectLink(link.id));
+    graph.d3Force("charge").strength(-20);
+    graph.cameraPosition({ x: 15, y: 24, z: 620 }, { x: 10, y: 0, z: 0 }, 0);
+    graphRef.current = graph;
+    const observer = new ResizeObserver(() => {
+      graph.width(container.clientWidth).height(container.clientHeight);
     });
-  });
+    observer.observe(container);
+    const ambient = gsap.to(container, {
+      "--ambient": 1,
+      duration: 3,
+      yoyo: true,
+      repeat: -1,
+      ease: "sine.inOut",
+    });
+    return () => {
+      observer.disconnect();
+      ambient.kill();
+      graph._destructor();
+      graphRef.current = null;
+    };
+  }, [graphData]);
+
+  useEffect(() => {
+    const graph = graphRef.current;
+    if (!graph) return;
+    const travelling = new Set(
+      state.signals
+        .filter((signal) => signal.status === "travelling")
+        .map((signal) => `${signal.source}:${signal.target}`),
+    );
+    const profile = state.careerProfiles.find(
+      (item) => item.id === state.selectedCareerId,
+    );
+    const traced = new Set([
+      "evidence:bridge",
+      "bridge:careers",
+      "careers:tutor",
+      "evidence:tutor",
+      "tutor:peter2",
+      "peter2:output",
+    ]);
+    for (const id of profile?.evidenceIds ?? []) {
+      const path =
+        state.evidenceAnalysis?.evidence.find((item) => item.id === id)?.path ??
+        [];
+      for (let index = 1; index < path.length; index++)
+        traced.add(`${path[index - 1]}:${path[index]}`);
+    }
+    graph
+      .nodeThreeObject((node) =>
+        nodeObject(node, state, selectedId, reducedMotion),
+      )
+      .linkColor((link) => {
+        const source = endpoint(link.source);
+        const target = endpoint(link.target);
+        const active = state.phase >= link.phase;
+        if (traceMode)
+          return traced.has(link.id) ? "#e5c985" : "rgba(71,89,109,0.08)";
+        if (travelling.has(link.id)) return "#89e9f2";
+        if (
+          highlightFlow &&
+          (source === phases[state.phase].node ||
+            target === phases[state.phase].node)
+        )
+          return "#a7d9ef";
+        return active ? "rgba(118,155,188,0.55)" : "rgba(76,104,134,0.13)";
+      })
+      .linkWidth((link) =>
+        travelling.has(link.id)
+          ? 2.5
+          : traceMode
+            ? 1.5
+            : state.phase >= link.phase
+              ? 1.1
+              : 0.3,
+      )
+      .linkDirectionalParticles((link) =>
+        !reducedMotion && travelling.has(link.id) ? 3 : 0,
+      )
+      .linkDirectionalParticleWidth(2.5)
+      .linkDirectionalParticleSpeed(0.012)
+      .refresh();
+  }, [state, selectedId, traceMode, highlightFlow, reducedMotion]);
+
+  useEffect(() => {
+    const graph = graphRef.current;
+    if (!graph) return;
+    const id =
+      selectedId ?? (state.mode === "guided" ? phases[state.phase].node : null);
+    if (!id) return;
+    const node = graph.graphData().nodes.find((item) => item.id === id);
+    if (!node) return;
+    const overview = !selectedId && (state.phase === 4 || state.phase === 11);
+    const zoom = selectedId ? 145 : overview ? 620 : 225;
+    const lookAt = overview
+      ? { x: 12, y: 0, z: 0 }
+      : { x: node.fx, y: node.fy, z: node.fz };
+    const target = overview
+      ? { x: 20, y: 24, z: zoom }
+      : { x: node.fx + 35, y: node.fy + 25, z: node.fz + zoom };
+    if (reducedMotion) graph.cameraPosition(target, lookAt, 0);
+    else {
+      const camera = { ...graph.cameraPosition() };
+      const tween = gsap.to(camera, {
+        ...target,
+        duration: 0.9 / state.speed,
+        ease: "power2.inOut",
+        onUpdate: () => graph.cameraPosition(camera, lookAt, 0),
+      });
+      return () => tween.kill();
+    }
+  }, [state.phase, state.mode, state.speed, selectedId, reducedMotion]);
+
+  return (
+    <div
+      className="graph-stage"
+      ref={containerRef}
+      role="img"
+      aria-label="Red tridimensional del flujo SAVP-TIS3"
+    />
+  );
 }
